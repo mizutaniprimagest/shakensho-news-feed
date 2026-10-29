@@ -2,8 +2,8 @@ name: check-news
 
 on:
   schedule:
-    # 毎時17分 (UTC)。毎時0分は混雑して遅延しやすいためずらす
-    - cron: '17 * * * *'
+    # 毎日 8:30 (日本時間) = 23:30 (UTC)
+    - cron: '30 23 * * *'
   workflow_dispatch:
     inputs:
       test_item:
