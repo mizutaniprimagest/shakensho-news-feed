@@ -1,0 +1,55 @@
+name: check-news
+
+on:
+  schedule:
+    # 毎時17分 (UTC)。毎時0分は混雑して遅延しやすいためずらす
+    - cron: '17 * * * *'
+  workflow_dispatch:
+    inputs:
+      test_item:
+        description: '配信確認用のテスト項目をフィードに加える'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: check-news
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check news and build feed
+        shell: pwsh
+        run: ./check.ps1 -TestItem:$${{ inputs.test_item == true }}
+
+      - name: Commit state
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          # 公開リポジトリは60日間更新がないと定期実行が止まるため、30日ごとに keepalive を更新する
+          if [ $(( $(date +%s) - $(git log -1 --format=%ct) )) -gt 2592000 ]; then
+            date -u +%Y-%m-%dT%H:%M:%SZ > keepalive.txt
+          fi
+          git add state.json keepalive.txt 2>/dev/null || git add state.json
+          if ! git diff --cached --quiet; then
+            git commit -m 'Update news state'
+            git push
+          fi
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - id: deploy
+        uses: actions/deploy-pages@v4
